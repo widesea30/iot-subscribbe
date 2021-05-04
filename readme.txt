@@ -7,4 +7,4 @@ mkdir logs
 
 sudo crontab -e
 
-@reboot sleep 30; sh /home/ubuntu/iot-subscribe/launcher.sh >/home/ubuntu/logs/cronlog 2>&1
+@reboot sleep 60; sh /home/ubuntu/iot-subscribe/launcher.sh >> /home/ubuntu/logs/cronlog 2>&1

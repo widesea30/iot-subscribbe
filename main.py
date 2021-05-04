@@ -23,6 +23,34 @@ def on_connect(unusued_client, unused_userdata, unused_flags, rc):
     print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), 'on_connect', error_str(rc))
 
 
+def publish_command(command, topic):
+    awshost = cp.get('Default', 'awshost')
+    awsport = 8883
+    caPath = cp.get('Default', 'caPath')
+    certPath = cp.get('Default', 'certPath')
+    keyPath = cp.get('Default', 'keyPath')
+
+    client = mqtt.Client()
+
+    client.on_connect = on_connect
+    client.on_publish = on_publish
+
+    client.tls_set(caPath, certfile=certPath, keyfile=keyPath, cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2, ciphers=None)
+
+    client.connect(awshost, awsport, keepalive=60)
+
+    client.loop_start()
+
+    print(topic, command)
+    client.publish(topic, command, qos=1)
+
+    client.loop_stop()
+
+
+def on_publish(unused_client, unused_userdata, unused_mid):
+    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'on_publish')
+
+
 # handle income message
 def on_message(client, userdata, message):
     sleep(1)
@@ -74,6 +102,43 @@ def on_message(client, userdata, message):
         # get decoded data
         js_decoder = db_data[24]
         datadecoded = str(get_decoded_data(js_decoder, get_item_from_dict('fPort', json_data), get_item_from_dict('data', json_data)))
+        datadecoded = datadecoded.replace("\'", "\"")
+        json_datadecoded = json.loads(datadecoded, parse_float=Decimal)
+        print(json_datadecoded, len(json_datadecoded))
+        print('command', db_data[26])
+
+        ss = message.topic.split('/')
+        prefix = ss[0]
+        subtopic = ss[1]
+        if subtopic == 'events':
+            # Insert event
+            if len(json_datadecoded) > 0:
+                db = MySQLdb.connect(host=cp.get('Default', 'host'),
+                                 user=cp.get('Default', 'user'),
+                                 passwd=cp.get('Default', 'passwd'),
+                                 db=cp.get('Default', 'db'))
+                cursor = db.cursor()
+                if json_datadecoded['water_leak']:
+                    status = 0
+                    if json_datadecoded['water_leak'] == 'leak':
+                        status = 1
+                    query = "INSERT INTO event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % ('water_leak', status, db_data[0], timestamp)
+                    cursor.execute(query)
+                    db.commit()
+                cursor.close()
+                db.close()
+
+            # Send close command
+            commands = db_data[26]
+            if commands and json_datadecoded['water_leak'] == 'leak':
+                close_command = ''
+                command_list = commands.splitlines()
+                for command in command_list:
+                    if command.find('CLOSE') > -1:
+                        idx1 = command.find('{')
+                        idx2 = command.find('}')
+                        close_command = command[idx1:idx2+1]
+                        publish_command(close_command, prefix + '/commands/' + devEUI)
 
         # create new item to be inserted into dynamodb
         new_item = {
