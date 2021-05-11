@@ -23,3 +23,8 @@ sudo systemctl start mysubscriber
 
 - enable the service by running the following command in the terminal:
 sudo systemctl enable mysubscriber
+
+- restart service every 4hrs
+sudo crontab -e
+then add below command
+* */4 * * * sudo systemctl restart mysubscriber
