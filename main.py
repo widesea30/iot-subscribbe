@@ -122,7 +122,7 @@ def on_message(client, userdata, message):
                     status = 0
                     if json_datadecoded['water_leak'] == 'leak':
                         status = 1
-                    query = "INSERT INTO event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % ('water_leak', status, db_data[0], timestamp)
+                    query = "INSERT INTO event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % ('Water leak detected', status, db_data[0], timestamp)
                     cursor.execute(query)
                     db.commit()
                 cursor.close()
