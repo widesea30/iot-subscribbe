@@ -82,12 +82,12 @@ def on_message(client, userdata, message):
     buildingMqttTopicPrefix, buildingCreatedDate, buildingLastAccessDate, buildingFloorUID, buildingFloorName, 
     buildingFloorDescription, buildingFloorLastAccessDate, buildingFloorAreaUID,
     buildingFloorAreaName, buildingFloorAreaDescription, buildingFloorAreaLastAccessDate
-    from device d
-    left join devicemodel dm on d.deviceModel=dm.id
-    left join buildingfloorarea bfa on d.buildingFloorArea=bfa.id
-    left join buildingfloor bf on bfa.buildingFloor=bf.id
-    left join building b on bf.building=b.id
-    left join account a on b.account=a.id
+    from Device d
+    left join DeviceModel dm on d.deviceModel=dm.id
+    left join BuildingFloorArea bfa on d.buildingFloorArea=bfa.id
+    left join BuildingFloor bf on bfa.buildingFloor=bf.id
+    left join Building b on bf.building=b.id
+    left join Account a on b.account=a.id
     where devEUI='%s'
     ''' % devEUI
     cursor.execute(query)
@@ -122,7 +122,7 @@ def on_message(client, userdata, message):
                     status = 0
                     if json_datadecoded['water_leak'] == 'leak':
                         status = 1
-                    query = "INSERT INTO event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % ('Water leak detected', status, db_data[0], timestamp)
+                    query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % ('Water leak detected', status, db_data[0], timestamp)
                     cursor.execute(query)
                     db.commit()
                 cursor.close()
