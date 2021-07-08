@@ -55,7 +55,8 @@ def on_publish(unused_client, unused_userdata, unused_mid):
 def on_message(client, userdata, message):
     sleep(1)
     print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), "message topic=",message.topic)
-
+    print(str(message.payload.decode("utf-8")))
+    return
     # convert message body to json
     json_data = json.loads(str(message.payload.decode("utf-8")), parse_float=Decimal)
 
@@ -111,22 +112,55 @@ def on_message(client, userdata, message):
         prefix = ss[0]
         subtopic = ss[1]
         if subtopic == 'events':
-            # Insert event
-            if len(json_datadecoded) > 0:
-                db = MySQLdb.connect(host=cp.get('Default', 'host'),
+            db = MySQLdb.connect(host=cp.get('Default', 'host'),
                                  user=cp.get('Default', 'user'),
                                  passwd=cp.get('Default', 'passwd'),
                                  db=cp.get('Default', 'db'))
-                cursor = db.cursor()
-                if json_datadecoded['water_leak']:
+            cursor = db.cursor()
+
+            deviceBattery = -1
+            # Insert event
+            if len(json_datadecoded) > 0:
+                if get_item_from_dict('water_leak', json_datadecoded):
                     status = 0
                     if json_datadecoded['water_leak'] == 'leak':
                         status = 1
                     query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % ('Water leak detected', status, db_data[0], timestamp)
                     cursor.execute(query)
                     db.commit()
-                cursor.close()
-                db.close()
+
+                battery = get_item_from_dict('battery', json_datadecoded)
+                if battery:
+                    if battery < 2.7:
+                        query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % (
+                        'Low Battery', 1, db_data[0], timestamp)
+                        cursor.execute(query)
+                        deviceBattery = 0
+                    else:
+                        deviceBattery = 1
+
+            # Get battery & radio status
+            deviceRadio = -1
+            rxInfo = get_item_from_dict('rxInfo', json_data)
+            if rxInfo and len(rxInfo) > 0:
+                loRaSNR = get_item_from_dict('loRaSNR', rxInfo)
+                rssi = get_item_from_dict('loRaSNR', rssi)
+
+                if loRaSNR and rssi:
+                    if loRaSNR > 10 or rssi < -100:
+                        query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % (
+                            'Low Radio', 1, db_data[0], timestamp)
+                        cursor.execute(query)
+                        deviceRadio = 0
+                    else:
+                        deviceRadio = 1
+
+            query = "UPDATE DEVICE SET deviceBattery=%d, deviceRadio=%d WHERE id=%d" % (deviceBattery, deviceRadio, db_data[0])
+            cursor.execute(query)
+            db.commit()
+
+            cursor.close()
+            db.close()
 
             # Send close command
             commands = db_data[26]
@@ -234,7 +268,28 @@ def main():
     caPath = cp.get('Default', 'caPath')
     certPath = cp.get('Default', 'certPath')
     keyPath = cp.get('Default', 'keyPath')
-    topic = cp.get('Default', 'topic')
+
+    # connect to mysql server and get topics
+    db = MySQLdb.connect(host=cp.get('Default', 'host'),
+                         user=cp.get('Default', 'user'),
+                         passwd=cp.get('Default', 'passwd'),
+                         db=cp.get('Default', 'db'))
+    cursor = db.cursor()
+    query = "select buildingMqttTopicPrefix from Building"
+
+    cursor.execute(query)
+    db_data = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    topics = []
+    for item in db_data:
+        if item[0]:
+            topics.append((item[0]+'/#', 0))
+
+    if len(topics) == 0:
+        return
 
     client = mqtt.Client()
 
@@ -245,7 +300,7 @@ def main():
 
     client.connect(awshost, awsport, keepalive=60)
 
-    client.subscribe(topic)
+    client.subscribe(topics)
 
     client.loop_forever()
 
