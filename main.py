@@ -139,6 +139,10 @@ def on_message(client, userdata, message):
                     else:
                         deviceBattery = 1
 
+                    query = "UPDATE DEVICE SET deviceBattery=%d WHERE id=%d" % (deviceBattery, db_data[0])
+                    cursor.execute(query)
+                    db.commit()
+
             # Get battery & radio status
             deviceRadio = -1
             rxInfo = get_item_from_dict('rxInfo', json_data)
@@ -155,9 +159,9 @@ def on_message(client, userdata, message):
                     else:
                         deviceRadio = 1
 
-            query = "UPDATE DEVICE SET deviceBattery=%d, deviceRadio=%d WHERE id=%d" % (deviceBattery, deviceRadio, db_data[0])
-            cursor.execute(query)
-            db.commit()
+                    query = "UPDATE DEVICE SET deviceRadio=%d WHERE id=%d" % (deviceRadio, db_data[0])
+                    cursor.execute(query)
+                    db.commit()
 
             cursor.close()
             db.close()
