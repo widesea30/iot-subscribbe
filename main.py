@@ -131,7 +131,7 @@ def on_message(client, userdata, message):
 
                 battery = get_item_from_dict('battery', json_datadecoded)
                 if battery:
-                    if battery < 2.7:
+                    if battery < float(cp.get('Default', 'thres_Battery')):
                         query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % (
                         'Low Battery', 1, db_data[0], timestamp)
                         cursor.execute(query)
@@ -139,7 +139,7 @@ def on_message(client, userdata, message):
                     else:
                         deviceBattery = 1
 
-                    query = "UPDATE DEVICE SET deviceBattery=%d WHERE id=%d" % (deviceBattery, db_data[0])
+                    query = "UPDATE DEVICE SET deviceBattery=%d, deviceBatteryUpdatedDate='%s' WHERE id=%d" % (deviceBattery, timestamp, db_data[0])
                     cursor.execute(query)
                     db.commit()
 
@@ -151,7 +151,7 @@ def on_message(client, userdata, message):
                 rssi = get_item_from_dict('loRaSNR', rssi)
 
                 if loRaSNR and rssi:
-                    if loRaSNR > 10 or rssi < -100:
+                    if loRaSNR > float(cp.get('Default', 'thres_SNR')) or rssi < float(cp.get('Default', 'thres_RSSI')):
                         query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % (
                             'Low Radio', 1, db_data[0], timestamp)
                         cursor.execute(query)
@@ -159,7 +159,13 @@ def on_message(client, userdata, message):
                     else:
                         deviceRadio = 1
 
-                    query = "UPDATE DEVICE SET deviceRadio=%d WHERE id=%d" % (deviceRadio, db_data[0])
+                if loRaSNR:
+                    query = "UPDATE DEVICE SET deviceSNR=%d, deviceSNRUpdatedDate='%s' WHERE id=%d" % (loRaSNR, timestamp, db_data[0])
+                    cursor.execute(query)
+                    db.commit()
+
+                if rssi:
+                    query = "UPDATE DEVICE SET deviceRSSI=%d, deviceRSSIUpdatedDate='%s' WHERE id=%d" % (rssi, timestamp, db_data[0])
                     cursor.execute(query)
                     db.commit()
 
