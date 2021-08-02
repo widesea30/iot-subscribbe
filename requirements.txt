@@ -1,5 +1,4 @@
 paho-mqtt
-ssl
 js2py
 mysqlclient
 boto3
