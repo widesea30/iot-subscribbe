@@ -102,11 +102,14 @@ def on_message(client, userdata, message):
 
         # get decoded data
         js_decoder = db_data[24]
-        datadecoded = str(get_decoded_data(js_decoder, get_item_from_dict('fPort', json_data), get_item_from_dict('data', json_data)))
-        datadecoded = datadecoded.replace("\'", "\"")
-        json_datadecoded = json.loads(datadecoded, parse_float=Decimal)
-        print(json_datadecoded, len(json_datadecoded))
-        print('command', db_data[26])
+        if js_decoder:
+            datadecoded = str(get_decoded_data(js_decoder, get_item_from_dict('fPort', json_data), get_item_from_dict('data', json_data)))
+            datadecoded = datadecoded.replace("\'", "\"")
+            json_datadecoded = json.loads(datadecoded, parse_float=Decimal)
+            print(json_datadecoded, len(json_datadecoded))
+        else:
+            datadecoded = ''
+            json_datadecoded = {}
 
         ss = message.topic.split('/')
         prefix = ss[0]
@@ -296,7 +299,7 @@ def main():
     topics = []
     for item in db_data:
         if item[0]:
-            topics.append((item[0]+'/#', 0))
+            topics.append((item[0].strip()+'/#', 0))
 
     if len(topics) == 0:
         return
