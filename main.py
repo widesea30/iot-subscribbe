@@ -55,8 +55,7 @@ def on_publish(unused_client, unused_userdata, unused_mid):
 def on_message(client, userdata, message):
     sleep(1)
     print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), "message topic=",message.topic)
-    print(str(message.payload.decode("utf-8")))
-    return
+
     # convert message body to json
     json_data = json.loads(str(message.payload.decode("utf-8")), parse_float=Decimal)
 
@@ -151,7 +150,7 @@ def on_message(client, userdata, message):
             rxInfo = get_item_from_dict('rxInfo', json_data)
             if rxInfo and len(rxInfo) > 0:
                 loRaSNR = get_item_from_dict('loRaSNR', rxInfo)
-                rssi = get_item_from_dict('loRaSNR', rssi)
+                rssi = get_item_from_dict('loRaSNR', rxInfo)
 
                 if loRaSNR and rssi:
                     if loRaSNR > float(cp.get('Default', 'thres_SNR')) or rssi < float(cp.get('Default', 'thres_RSSI')):
@@ -211,7 +210,7 @@ def on_message(client, userdata, message):
             'deviceLastPayloadReceived': db_data[12], 'deviceCreatedDate': datetostring(db_data[13]), 
             'deviceLastAccessDate': datetostring(db_data[14]), 'deviceModelUID': db_data[15], 
             'deviceModelName': db_data[16], 
-            'deviceModelDescription': db_data[17] + ' / ' + db_data[18], 'deviceModelType': db_data[19], 
+            'deviceModelDescription': db_data[17], 'deviceModelType': db_data[19], 
             'deviceModelSupplierName': db_data[20], 'deviceModelClassName': db_data[21], 
             'deviceModelNetwork': db_data[22], 'deviceModelCategory': db_data[23], 
             'deviceModelDecoder': db_data[24], 'deviceModelEncoder': db_data[25], 
