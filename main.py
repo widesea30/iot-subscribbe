@@ -141,7 +141,7 @@ def on_message(client, userdata, message):
                     else:
                         deviceBattery = 1
 
-                    query = "UPDATE DEVICE SET deviceBattery=%d, deviceBatteryUpdatedDate='%s' WHERE id=%d" % (deviceBattery, timestamp, db_data[0])
+                    query = "UPDATE Device SET deviceBattery=%d, deviceBatteryUpdatedDate='%s' WHERE id=%d" % (deviceBattery, timestamp, db_data[0])
                     cursor.execute(query)
                     db.commit()
 
@@ -162,12 +162,12 @@ def on_message(client, userdata, message):
                         deviceRadio = 1
 
                 if loRaSNR:
-                    query = "UPDATE DEVICE SET deviceSNR=%d, deviceSNRUpdatedDate='%s' WHERE id=%d" % (loRaSNR, timestamp, db_data[0])
+                    query = "UPDATE Device SET deviceSNR=%d, deviceSNRUpdatedDate='%s' WHERE id=%d" % (loRaSNR, timestamp, db_data[0])
                     cursor.execute(query)
                     db.commit()
 
                 if rssi:
-                    query = "UPDATE DEVICE SET deviceRSSI=%d, deviceRSSIUpdatedDate='%s' WHERE id=%d" % (rssi, timestamp, db_data[0])
+                    query = "UPDATE Device SET deviceRSSI=%d, deviceRSSIUpdatedDate='%s' WHERE id=%d" % (rssi, timestamp, db_data[0])
                     cursor.execute(query)
                     db.commit()
 
