@@ -81,7 +81,7 @@ def on_message(client, userdata, message):
     buildingAltitude, buildingUrl, buildingPicture, buildingIcon, buildingStatus,
     buildingMqttTopicPrefix, buildingCreatedDate, buildingLastAccessDate, buildingFloorUID, buildingFloorName, 
     buildingFloorDescription, buildingFloorLastAccessDate, buildingFloorAreaUID,
-    buildingFloorAreaName, buildingFloorAreaDescription, buildingFloorAreaLastAccessDate
+    buildingFloorAreaName, buildingFloorAreaDescription, buildingFloorAreaLastAccessDate, deviceRelationship
     from Device d
     left join DeviceModel dm on d.deviceModel=dm.id
     left join BuildingFloorArea bfa on d.buildingFloorArea=bfa.id
@@ -171,20 +171,30 @@ def on_message(client, userdata, message):
                     cursor.execute(query)
                     db.commit()
 
+            # Send close command
+            deviceRelationship = db_data[70]
+            if deviceRelationship and json_datadecoded['water_leak'] == 'leak':
+                query = '''
+                select deviceModelValveCommand
+                from Device d
+                left join DeviceModel dm on d.deviceModel=dm.id
+                where devEUI='%s'
+                ''' % deviceRelationship
+                cursor.execute(query)
+                commands = cursor.fetchone()
+
+                if commands and commands[0]:
+                    close_command = ''
+                    command_list = commands[0].splitlines()
+                    for command in command_list:
+                        if command.find('CLOSE') > -1:
+                            idx1 = command.find('{')
+                            idx2 = command.find('}')
+                            close_command = command[idx1:idx2+1]
+                            publish_command(close_command, prefix + '/commands/' + deviceRelationship)
+
             cursor.close()
             db.close()
-
-            # Send close command
-            commands = db_data[26]
-            if commands and json_datadecoded['water_leak'] == 'leak':
-                close_command = ''
-                command_list = commands.splitlines()
-                for command in command_list:
-                    if command.find('CLOSE') > -1:
-                        idx1 = command.find('{')
-                        idx2 = command.find('}')
-                        close_command = command[idx1:idx2+1]
-                        publish_command(close_command, prefix + '/commands/' + devEUI)
 
         # create new item to be inserted into dynamodb
         new_item = {
