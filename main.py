@@ -97,7 +97,8 @@ def on_message(client, userdata, message):
 
     if db_data:
         id = str(uuid.uuid4())
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        dt = datetime.datetime.now()
+        timestamp = dt.strftime('%Y-%m-%d %H:%M:%S')
 
         # get decoded data
         js_decoder = db_data[24]
@@ -173,7 +174,7 @@ def on_message(client, userdata, message):
 
             # Send close command
             deviceRelationship = db_data[70]
-            if deviceRelationship and json_datadecoded['water_leak'] == 'leak':
+            if deviceRelationship and get_item_from_dict('water_leak', json_datadecoded) and json_datadecoded['water_leak'] == 'leak':
                 query = '''
                 select deviceModelValveCommand
                 from Device d
@@ -198,7 +199,7 @@ def on_message(client, userdata, message):
 
         # create new item to be inserted into dynamodb
         new_item = {
-            'id': id, 'timestamp': timestamp, 'topic': message.topic, 
+            'id': id, 'timestamp': int(dt.timestamp()), 'topic': message.topic, 
             'applicationID': get_item_from_dict('applicationID', json_data),
             'applicationName': get_item_from_dict('applicationName', json_data),
             'data': get_item_from_dict('data', json_data),
@@ -217,7 +218,7 @@ def on_message(client, userdata, message):
             'deviceAssetNumber': db_data[6], 'deviceLatitude': str(db_data[7]), 
             'deviceLongitude': str(db_data[8]), 'deviceAltitude': str(db_data[9]), 
             'deviceMACAddress': db_data[10], 'devicePicture': db_data[11], 
-            'deviceLastPayloadReceived': db_data[12], 'deviceCreatedDate': datetostring(db_data[13]), 
+            'deviceLastPayloadReceived': datetostring(db_data[12]), 'deviceCreatedDate': datetostring(db_data[13]), 
             'deviceLastAccessDate': datetostring(db_data[14]), 'deviceModelUID': db_data[15], 
             'deviceModelName': db_data[16], 
             'deviceModelDescription': db_data[17], 'deviceModelType': db_data[19], 
@@ -248,9 +249,9 @@ def on_message(client, userdata, message):
             'buildingFloorAreaDescription': db_data[68], 
             'buildingFloorAreaLastAccessDate': datetostring(db_data[69])
         }
-
+        print(new_item)
         dynamodb = boto3.resource('dynamodb', aws_access_key_id=cp.get('Default', 'aws_access_key_id'), aws_secret_access_key=cp.get('Default', 'aws_secret_access_key'), region_name=cp.get('Default', 'region_name'))
-        table = dynamodb.Table('tfmqtt')
+        table = dynamodb.Table('tfmqtt_stream')
         res = table.put_item(Item=new_item)
         print(res)
 
