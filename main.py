@@ -121,7 +121,11 @@ def on_message(client, userdata, message):
                                  db=cp.get('Default', 'db'))
             cursor = db.cursor()
 
-            deviceBattery = -1
+
+            query = "UPDATE Device SET deviceLastPayloadReceived='%s' WHERE id=%d" % (timestamp, db_data[0])
+            cursor.execute(query)
+            db.commit()
+
             # Insert event
             if len(json_datadecoded) > 0:
                 if get_item_from_dict('water_leak', json_datadecoded):
@@ -138,29 +142,34 @@ def on_message(client, userdata, message):
                         query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % (
                         'Low Battery', 1, db_data[0], timestamp)
                         cursor.execute(query)
-                        deviceBattery = 0
-                    else:
-                        deviceBattery = 1
 
-                    query = "UPDATE Device SET deviceBattery=%d, deviceBatteryUpdatedDate='%s' WHERE id=%d" % (deviceBattery, timestamp, db_data[0])
+                    query = "UPDATE Device SET deviceBattery=%d, deviceBatteryUpdatedDate='%s' WHERE id=%d" % (battery, timestamp, db_data[0])
                     cursor.execute(query)
                     db.commit()
 
-            # Get battery & radio status
-            deviceRadio = -1
+                dout1 = get_item_from_dict('dout1', json_datadecoded)
+                if dout1:
+                    valveStatus = -1
+                    if dout1 == 'off':
+                        valveStatus = 1
+                    else:
+                        valveStatus = 0
+
+                    query = "UPDATE Device SET deviceValveStatus=%d WHERE id=%d" % (valveStatus, db_data[0])
+                    cursor.execute(query)
+                    db.commit()
+
+            # Get radio status
             rxInfo = get_item_from_dict('rxInfo', json_data)
             if rxInfo and len(rxInfo) > 0:
-                loRaSNR = get_item_from_dict('loRaSNR', rxInfo)
-                rssi = get_item_from_dict('loRaSNR', rxInfo)
+                loRaSNR = get_item_from_dict('loRaSNR', rxInfo[0])
+                rssi = get_item_from_dict('rssi', rxInfo[0])
 
                 if loRaSNR and rssi:
                     if loRaSNR > float(cp.get('Default', 'thres_SNR')) or rssi < float(cp.get('Default', 'thres_RSSI')):
                         query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % (
                             'Low Radio', 1, db_data[0], timestamp)
                         cursor.execute(query)
-                        deviceRadio = 0
-                    else:
-                        deviceRadio = 1
 
                 if loRaSNR:
                     query = "UPDATE Device SET deviceSNR=%d, deviceSNRUpdatedDate='%s' WHERE id=%d" % (loRaSNR, timestamp, db_data[0])
