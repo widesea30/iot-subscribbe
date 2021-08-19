@@ -136,6 +136,10 @@ def on_message(client, userdata, message):
                     cursor.execute(query)
                     db.commit()
 
+                    query = "UPDATE Device SET deviceLeakStatus=%d WHERE id=%d" % (status, db_data[0])
+                    cursor.execute(query)
+                    db.commit()
+
                 battery = get_item_from_dict('battery', json_datadecoded)
                 if battery:
                     if battery < float(cp.get('Default', 'thres_Battery')):
