@@ -154,7 +154,7 @@ def on_message(client, userdata, message):
                 dout1 = get_item_from_dict('dout1', json_datadecoded)
                 if dout1:
                     valveStatus = -1
-                    if dout1 == 'off':
+                    if dout1 == 'on':
                         valveStatus = 1
                     else:
                         valveStatus = 0
