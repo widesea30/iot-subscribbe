@@ -11,6 +11,7 @@ import base64
 import json
 import boto3
 from decimal import Decimal
+import pytz
 
 
 # handle error
@@ -97,7 +98,8 @@ def on_message(client, userdata, message):
 
     if db_data:
         id = str(uuid.uuid4())
-        dt = datetime.datetime.now()
+        tz = pytz.timezone(cp.get('Default', 'timezone'))
+        dt = datetime.datetime.now(tz=tz)
         timestamp = dt.strftime('%Y-%m-%d %H:%M:%S')
 
         # get decoded data
@@ -262,7 +264,7 @@ def on_message(client, userdata, message):
             'buildingFloorAreaDescription': db_data[68], 
             'buildingFloorAreaLastAccessDate': datetostring(db_data[69])
         }
-        print(new_item)
+
         dynamodb = boto3.resource('dynamodb', aws_access_key_id=cp.get('Default', 'aws_access_key_id'), aws_secret_access_key=cp.get('Default', 'aws_secret_access_key'), region_name=cp.get('Default', 'region_name'))
         table = dynamodb.Table('tfmqtt_stream')
         res = table.put_item(Item=new_item)

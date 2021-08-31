@@ -28,3 +28,6 @@ sudo systemctl enable mysubscriber
 sudo crontab -e
 then add below command
 * */4 * * * sudo timeout 5 systemctl restart mysubscriber
+
+
+* */4 * * * pgrep -f demo-main.py || sudo timeout 5 systemctl restart demosubscriber
