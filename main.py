@@ -22,7 +22,11 @@ def error_str(rc):
 # connect status
 def on_connect(unusued_client, unused_userdata, unused_flags, rc):
     print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), 'on_connect', error_str(rc))
-
+    if rc==0:
+        print('connected')
+        global connected
+        connected = True
+        
 
 def publish_command(command, topic):
     awshost = cp.get('Default', 'awshost')
@@ -54,7 +58,6 @@ def on_publish(unused_client, unused_userdata, unused_mid):
 
 # handle income message
 def on_message(client, userdata, message):
-    sleep(1)
     print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), "message topic=",message.topic)
 
     # convert message body to json
@@ -307,45 +310,58 @@ def main():
     certPath = cp.get('Default', 'certPath')
     keyPath = cp.get('Default', 'keyPath')
 
-    # connect to mysql server and get topics
-    db = MySQLdb.connect(host=cp.get('Default', 'host'),
-                         user=cp.get('Default', 'user'),
-                         passwd=cp.get('Default', 'passwd'),
-                         db=cp.get('Default', 'db'))
-    cursor = db.cursor()
-    query = "select buildingMqttTopicPrefix from Building"
+    while True:
+        global connected
+        connected = False
 
-    cursor.execute(query)
-    db_data = cursor.fetchall()
+        # connect to mysql server and get topics
+        db = MySQLdb.connect(host=cp.get('Default', 'host'),
+                             user=cp.get('Default', 'user'),
+                             passwd=cp.get('Default', 'passwd'),
+                             db=cp.get('Default', 'db'))
+        cursor = db.cursor()
+        query = "select buildingMqttTopicPrefix from Building"
 
-    cursor.close()
-    db.close()
+        cursor.execute(query)
+        db_data = cursor.fetchall()
 
-    topics = []
-    for item in db_data:
-        if item[0]:
-            topics.append((item[0].strip()+'/#', 0))
+        cursor.close()
+        db.close()
 
-    if len(topics) == 0:
-        return
+        topics = []
+        for item in db_data:
+            if item[0]:
+                topics.append((item[0].strip()+'/#', 0))
 
-    client = mqtt.Client()
+        if len(topics) == 0:
+            return
 
-    client.on_connect = on_connect
-    client.on_message = on_message
+        client = mqtt.Client()
 
-    client.tls_set(caPath, certfile=certPath, keyfile=keyPath, cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2, ciphers=None)
+        client.on_connect = on_connect
+        client.on_message = on_message
 
-    client.connect(awshost, awsport, keepalive=60)
+        client.tls_set(caPath, certfile=certPath, keyfile=keyPath, cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2, ciphers=None)
 
-    client.subscribe(topics)
+        client.connect(awshost, awsport, keepalive=60)
 
-    client.loop_forever()
+        client.loop_start()
+
+        while connected != True:
+            sleep(0.1)
+
+        client.subscribe(topics)
+
+        sleep(3600)
+        client.loop_stop()
+        sleep(10)        
 
 
 # Read config
 cp = configparser.RawConfigParser()
 cp.read('setting.cfg')
+
+connected = False
 
 
 if __name__ == '__main__':
