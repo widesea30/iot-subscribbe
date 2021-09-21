@@ -134,23 +134,54 @@ def on_message(client, userdata, message):
             # Insert event
             if len(json_datadecoded) > 0:
                 if get_item_from_dict('water_leak', json_datadecoded):
-                    status = 0
-                    if json_datadecoded['water_leak'] == 'leak':
-                        status = 1
-                    query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % ('Water leak detected', status, db_data[0], timestamp)
+                    query = '''
+                        SELECT eventResolvedDate FROM Event WHERE device_id=%d and eventDescription='Water leak detected' 
+                        ORDER BY eventCreatedDate DESC LIMIT 1
+                    ''' % db_data[0]
                     cursor.execute(query)
-                    db.commit()
+                    values = cursor.fetchone()
 
-                    query = "UPDATE Device SET deviceLeakStatus=%d WHERE id=%d" % (status, db_data[0])
-                    cursor.execute(query)
-                    db.commit()
+                    if json_datadecoded['water_leak'] == 'leak':
+                        if values is None or values[0] is not None:
+                            query = '''
+                                INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
+                                VALUES ('%s', %d, %d, '%s')
+                            ''' % ('Water leak detected', 1, db_data[0], timestamp)
+                            cursor.execute(query)
+                            db.commit()
+                    else:
+                        if values and values[0] is None:
+                            query = '''
+                                UPDATE Event SET eventResolvedDate='%s' 
+                                WHERE device_id=%d AND eventDescription='Water leak detected' and eventResolvedDate IS NULL
+                            ''' % (timestamp, db_data[0])
+                            cursor.execute(query)
+                            db.commit()
 
                 battery = get_item_from_dict('battery', json_datadecoded)
                 if battery:
+                    query = '''
+                        SELECT eventResolvedDate FROM Event WHERE device_id=%d and eventDescription='Low Battery' 
+                        ORDER BY eventCreatedDate DESC LIMIT 1
+                    ''' % db_data[0]
+                    cursor.execute(query)
+                    values = cursor.fetchone()
+
                     if battery < float(cp.get('Default', 'thres_Battery')):
-                        query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % (
-                        'Low Battery', 1, db_data[0], timestamp)
-                        cursor.execute(query)
+                        if values is None or values[0] is not None:
+                            query = '''
+                                INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
+                                VALUES ('%s', %d, %d, '%s')
+                            ''' % ('Low Battery', 1, db_data[0], timestamp)
+                            cursor.execute(query)
+                    else:
+                        if values and values[0] is None:
+                            query = '''
+                                UPDATE Event SET eventResolvedDate='%s' 
+                                WHERE device_id=%d AND eventDescription='Low Battery' AND eventResolvedDate IS NULL
+                            ''' % (timestamp, db_data[0])
+                            cursor.execute(query)
+                            db.commit()
 
                     query = "UPDATE Device SET deviceBattery=%d, deviceBatteryUpdatedDate='%s' WHERE id=%d" % (battery, timestamp, db_data[0])
                     cursor.execute(query)
@@ -174,19 +205,40 @@ def on_message(client, userdata, message):
                 loRaSNR = get_item_from_dict('loRaSNR', rxInfo[0])
                 rssi = get_item_from_dict('rssi', rxInfo[0])
 
+                query = '''
+                    SELECT eventResolvedDate FROM Event WHERE device_id=%d and eventDescription='Low Radio' 
+                    ORDER BY eventCreatedDate DESC LIMIT 1
+                ''' % db_data[0]
+                cursor.execute(query)
+                values = cursor.fetchone()
+
                 if loRaSNR and rssi:
                     if loRaSNR > float(cp.get('Default', 'thres_SNR')) or rssi < float(cp.get('Default', 'thres_RSSI')):
-                        query = "INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) VALUES ('%s', %d, %d, '%s')" % (
-                            'Low Radio', 1, db_data[0], timestamp)
-                        cursor.execute(query)
+                        if values is None or values[0] is not None:
+                            query = '''
+                                INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
+                                VALUES ('%s', %d, %d, '%s')
+                            ''' % ('Low Radio', 1, db_data[0], timestamp)
+                            cursor.execute(query)
+                            db.commit()
+                    else:
+                        if values and values[0] is None:
+                            query = '''
+                                UPDATE Event SET eventResolvedDate='%s' 
+                                WHERE device_id=%d AND eventDescription='Low Radio' AND eventResolvedDate IS NULL
+                            ''' % (timestamp, db_data[0])
+                            cursor.execute(query)
+                            db.commit()
 
                 if loRaSNR:
-                    query = "UPDATE Device SET deviceSNR=%d, deviceSNRUpdatedDate='%s' WHERE id=%d" % (loRaSNR, timestamp, db_data[0])
+                    query = "UPDATE Device SET deviceSNR=%d, deviceSNRUpdatedDate='%s' WHERE id=%d" \
+                            % (loRaSNR, timestamp, db_data[0])
                     cursor.execute(query)
                     db.commit()
 
                 if rssi:
-                    query = "UPDATE Device SET deviceRSSI=%d, deviceRSSIUpdatedDate='%s' WHERE id=%d" % (rssi, timestamp, db_data[0])
+                    query = "UPDATE Device SET deviceRSSI=%d, deviceRSSIUpdatedDate='%s' WHERE id=%d" \
+                            % (rssi, timestamp, db_data[0])
                     cursor.execute(query)
                     db.commit()
 
