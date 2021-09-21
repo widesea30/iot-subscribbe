@@ -96,12 +96,20 @@ def on_message(client, userdata, message):
     ''' % devEUI
     cursor.execute(query)
     db_data = cursor.fetchone()
+
+    query = "SELECT defaultTimeZone FROM Configuration"
+    cursor.execute(query)
+    tz_data = cursor.fetchone()
+
     cursor.close()
     db.close()
 
     if db_data:
         id = str(uuid.uuid4())
-        tz = pytz.timezone(cp.get('Default', 'timezone'))
+        ttz = 'America/Toronto'
+        if tz_data:
+            ttz = tz_data[0]
+        tz = pytz.timezone(ttz)
         dt = datetime.datetime.now(tz=tz)
         timestamp = dt.strftime('%Y-%m-%d %H:%M:%S')
 
