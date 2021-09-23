@@ -254,7 +254,7 @@ def on_message(client, userdata, message):
             deviceRelationship = db_data[70]
             if deviceRelationship and get_item_from_dict('water_leak', json_datadecoded) and json_datadecoded['water_leak'] == 'leak':
                 query = '''
-                select deviceModelValveCommand
+                select d.id as id, deviceModelValveCommand
                 from Device d
                 left join DeviceModel dm on d.deviceModel=dm.id
                 where devEUI='%s'
@@ -262,14 +262,22 @@ def on_message(client, userdata, message):
                 cursor.execute(query)
                 commands = cursor.fetchone()
 
-                if commands and commands[0]:
+                if commands and commands[1]:
                     close_command = ''
-                    command_list = commands[0].splitlines()
+                    command_list = commands[1].splitlines()
                     for command in command_list:
                         if command.find('CLOSE') > -1:
                             idx1 = command.find('{')
                             idx2 = command.find('}')
                             close_command = command[idx1:idx2+1]
+
+                            # insert valve close
+                            query = '''
+                                INSERT INTO ValveClose (valveCloseDate, device_id) VALUES ('%s', %d)
+                            ''' % (timestamp, commands[0])
+                            cursor.execute(query)
+                            db.commit()
+
                             publish_command(close_command, prefix + '/commands/' + deviceRelationship)
 
             cursor.close()
