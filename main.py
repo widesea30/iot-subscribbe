@@ -29,27 +29,27 @@ def on_connect(unusued_client, unused_userdata, unused_flags, rc):
         
 
 def publish_command(command, topic):
-    awshost = cp.get('Default', 'awshost')
-    awsport = 8883
-    caPath = cp.get('Default', 'caPath')
-    certPath = cp.get('Default', 'certPath')
-    keyPath = cp.get('Default', 'keyPath')
-
-    client = mqtt.Client()
-
-    client.on_connect = on_connect
-    client.on_publish = on_publish
-
-    client.tls_set(caPath, certfile=certPath, keyfile=keyPath, cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2, ciphers=None)
-
-    client.connect(awshost, awsport, keepalive=60)
-
-    client.loop_start()
-
-    print(topic, command)
+    # awshost = cp.get('Default', 'awshost')
+    # awsport = 8883
+    # caPath = cp.get('Default', 'caPath')
+    # certPath = cp.get('Default', 'certPath')
+    # keyPath = cp.get('Default', 'keyPath')
+    #
+    # client = mqtt.Client()
+    #
+    # client.on_connect = on_connect
+    # client.on_publish = on_publish
+    #
+    # client.tls_set(caPath, certfile=certPath, keyfile=keyPath, cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2, ciphers=None)
+    #
+    # client.connect(awshost, awsport, keepalive=60)
+    #
+    # client.loop_start()
+    #
+    # print(topic, command)
     client.publish(topic, command, qos=1)
 
-    client.loop_stop()
+    # client.loop_stop()
 
 
 def on_publish(unused_client, unused_userdata, unused_mid):
@@ -404,7 +404,7 @@ def main():
         if len(topics) == 0:
             return
 
-        client = mqtt.Client()
+        # client = mqtt.Client()
 
         client.on_connect = on_connect
         client.on_message = on_message
@@ -415,15 +415,17 @@ def main():
 
         client.loop_start()
 
-        while connected != True:
+        while not connected:
             sleep(0.1)
 
         client.subscribe(topics)
 
         sleep(3600)
         client.loop_stop()
-        sleep(10)        
+        sleep(10)
 
+
+client = mqtt.Client()
 
 # Read config
 cp = configparser.RawConfigParser()
