@@ -11,7 +11,6 @@ import base64
 import json
 import boto3
 from decimal import Decimal
-import pytz
 from threading import Thread
 from queue import Queue
 
@@ -55,7 +54,7 @@ def publish_command(command, topic):
 
 
 def on_publish(unused_client, unused_userdata, unused_mid):
-    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'on_publish')
+    print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), 'on_publish')
 
 
 # handle income message
@@ -107,20 +106,12 @@ def handle_message(stop):
                 cursor.execute(query)
                 db_data = cursor.fetchone()
 
-                query = "SELECT defaultTimeZone FROM Configuration"
-                cursor.execute(query)
-                tz_data = cursor.fetchone()
-
                 cursor.close()
                 db.close()
 
                 if db_data:
                     id = str(uuid.uuid4())
-                    ttz = 'America/Toronto'
-                    if tz_data:
-                        ttz = tz_data[0]
-                    tz = pytz.timezone(ttz)
-                    dt = datetime.datetime.now(tz=tz)
+                    dt = datetime.datetime.utcnow()
                     timestamp = dt.strftime('%Y-%m-%d %H:%M:%S')
 
                     # get decoded data
