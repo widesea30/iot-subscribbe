@@ -215,7 +215,7 @@ def handle_message(stop):
                             rssi = get_item_from_dict('rssi', rxInfo[0])
 
                             query = '''
-                                SELECT eventResolvedDate FROM Event WHERE device_id=%d and eventDescription='Low Radio' 
+                                SELECT eventResolvedDate FROM Event WHERE device_id=%d and eventDescription='Radio Lost' 
                                 ORDER BY eventCreatedDate DESC LIMIT 1
                             ''' % db_data[0]
                             cursor.execute(query)
@@ -227,14 +227,14 @@ def handle_message(stop):
                                         query = '''
                                             INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
                                             VALUES ('%s', %d, %d, '%s')
-                                        ''' % ('Low Radio', 1, db_data[0], timestamp)
+                                        ''' % ('Radio Lost', 1, db_data[0], timestamp)
                                         cursor.execute(query)
                                         db.commit()
                                 else:
                                     if values and values[0] is None:
                                         query = '''
                                             UPDATE Event SET eventResolvedDate='%s' 
-                                            WHERE device_id=%d AND eventDescription='Low Radio' AND eventResolvedDate IS NULL
+                                            WHERE device_id=%d AND eventDescription='Radio Lost' AND eventResolvedDate IS NULL
                                         ''' % (timestamp, db_data[0])
                                         cursor.execute(query)
                                         db.commit()
@@ -280,6 +280,14 @@ def handle_message(stop):
                                         db.commit()
 
                                         publish_command(close_command, prefix + '/commands/' + deviceRelationship)
+
+                                        # add Valve Closed event
+                                        query = '''
+                                            INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
+                                            VALUES ('%s', %d, %d, '%s')
+                                        ''' % ('Valve Closed', 1, db_data[0], timestamp)
+                                        cursor.execute(query)
+                                        db.commit()
 
                         cursor.close()
                         db.close()
