@@ -285,7 +285,7 @@ def handle_message(stop):
                                         query = '''
                                             INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
                                             VALUES ('%s', %d, %d, '%s')
-                                        ''' % ('Valve Closed', 1, db_data[0], timestamp)
+                                        ''' % ('Valve Closed', 1, commands[0], timestamp)
                                         cursor.execute(query)
                                         db.commit()
 
