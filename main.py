@@ -98,8 +98,8 @@ def handle_message(stop):
                 from Device d
                 left join DeviceModel dm on d.deviceModel=dm.id
                 left join BuildingFloorArea bfa on d.buildingFloorArea=bfa.id
-                left join BuildingFloor bf on bfa.buildingFloor=bf.id
-                left join Building b on bf.building=b.id
+                left join BuildingFloor bf on d.buildingFloor=bf.id
+                left join Building b on d.building=b.id
                 left join Account a on b.account=a.id
                 where devEUI='%s'
                 ''' % devEUI
