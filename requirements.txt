@@ -1,4 +1,4 @@
 paho-mqtt
 js2py
-mysqlclient
 boto3
+psycopg2

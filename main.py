@@ -6,7 +6,7 @@ from time import sleep
 import ssl
 import uuid
 import js2py
-import MySQLdb
+import psycopg2
 import base64
 import json
 import boto3
@@ -30,27 +30,7 @@ def on_connect(unusued_client, unused_userdata, unused_flags, rc):
         
 
 def publish_command(command, topic):
-    # awshost = cp.get('Default', 'awshost')
-    # awsport = 8883
-    # caPath = cp.get('Default', 'caPath')
-    # certPath = cp.get('Default', 'certPath')
-    # keyPath = cp.get('Default', 'keyPath')
-    #
-    # client = mqtt.Client()
-    #
-    # client.on_connect = on_connect
-    # client.on_publish = on_publish
-    #
-    # client.tls_set(caPath, certfile=certPath, keyfile=keyPath, cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2, ciphers=None)
-    #
-    # client.connect(awshost, awsport, keepalive=60)
-    #
-    # client.loop_start()
-    #
-    # print(topic, command)
     client.publish(topic, command, qos=1)
-
-    # client.loop_stop()
 
 
 def on_publish(unused_client, unused_userdata, unused_mid):
@@ -72,37 +52,44 @@ def handle_message(stop):
                 # convert message body to json
                 json_data = json.loads(str(message.payload.decode("utf-8")), parse_float=Decimal)
 
+                ss = message.topic.split('/')
+                schema_name = ss[0]
+                prefix = ss[1]
+                subtopic = ss[2]
+
                 devEUI = get_item_from_dict('devEUI', json_data)
                 # connect to mysql server
-                db = MySQLdb.connect(host=cp.get('Default', 'host'),
-                                     user=cp.get('Default', 'user'),
-                                     passwd=cp.get('Default', 'passwd'),
-                                     db=cp.get('Default', 'db'))
+                db = psycopg2.connect(host=cp.get('Default', 'host'),
+                                      user=cp.get('Default', 'user'),
+                                      password=cp.get('Default', 'passwd'),
+                                      database=cp.get('Default', 'db'),
+                                      port=5432,
+                                      options="-c search_path=dbo,%s" % schema_name)
                 cursor = db.cursor()
                 query = '''
-                select d.id as deviceUID, buildingFloorAreaName, deviceApplicationEUI, deviceApplicationKey, 
-                deviceGatewayEUI, deviceSerialNumber, deviceAssetNumber, deviceLatitude, deviceLongitude, deviceAltitude,
-                deviceMACAddress, devicePicture, deviceLastPayloadReceived, deviceCreatedDate, deviceLastAccessDate, 
-                deviceModelUID, deviceModelName, en_deviceModelDescription, fr_deviceModelDescription, 
-                deviceModelType, deviceModelSupplierName, deviceModelClassName, deviceModelNetwork, deviceModelCategory, 
-                deviceModelDecoder, deviceModelEncoder, deviceModelValveCommand,
-                deviceModelCreatedDate, deviceModelLastAccessDate, a.id as accountUID, accountName, accountAddress, 
-                accountAddress2, accountCity, accountState, accountZipCode, accountCountry,
-                accountLatitude, accountLongitude, accountAltitude, accountUrl, accountStatus, accountCreatedDate, 
-                accountLastAccessDate, buildingUID, buildingName, buildingAddress, buildingAddress2,
-                buildingCity, buildingState, buildingZipCode, buildingCountry, buildingLatitude, buildingLongitude, 
-                buildingAltitude, buildingUrl, buildingPicture, buildingIcon, buildingStatus,
-                buildingMqttTopicPrefix, buildingCreatedDate, buildingLastAccessDate, buildingFloorUID, buildingFloorName, 
-                buildingFloorDescription, buildingFloorLastAccessDate, buildingFloorAreaUID,
-                buildingFloorAreaName, buildingFloorAreaDescription, buildingFloorAreaLastAccessDate, deviceRelationship
-                from Device d
-                left join DeviceModel dm on d.deviceModel=dm.id
-                left join BuildingFloorArea bfa on d.buildingFloorArea=bfa.id
-                left join BuildingFloor bf on d.buildingFloor=bf.id
-                left join Building b on d.building=b.id
-                left join Account a on b.account=a.id
-                where devEUI='%s'
-                ''' % devEUI
+                    select d."id" as "deviceUID", "buildingFloorAreaName", "deviceApplicationEUI", "deviceApplicationKey", 
+                    "deviceGatewayEUI", "deviceSerialNumber", "deviceAssetNumber", "deviceLatitude", "deviceLongitude", "deviceAltitude",
+                    "deviceMACAddress", "devicePicture", "deviceLastPayloadReceived", "deviceCreatedDate", "deviceLastAccessDate", 
+                    "deviceModelUID", "deviceModelName", "en_deviceModelDescription", "fr_deviceModelDescription", 
+                    "deviceModelType", "deviceModelSupplierName", "deviceModelClassName", "deviceModelNetwork", "deviceModelCategory", 
+                    "deviceModelDecoder", "deviceModelEncoder", "deviceModelValveCommand",
+                    "deviceModelCreatedDate", "deviceModelLastAccessDate", a."id" as "accountUID", "accountName", "accountAddress", 
+                    "accountAddress2", "accountCity", "accountState", "accountZipCode", "accountCountry",
+                    "accountLatitude", "accountLongitude", "accountAltitude", "accountUrl", "accountStatus", "accountCreatedDate", 
+                    "accountLastAccessDate", "buildingUID", "buildingName", "buildingAddress", "buildingAddress2",
+                    "buildingCity", "buildingState", "buildingZipCode", "buildingCountry", "buildingLatitude", "buildingLongitude", 
+                    "buildingAltitude", "buildingUrl", "buildingPicture", "buildingIcon", "buildingStatus",
+                    "buildingMqttTopicPrefix", "buildingCreatedDate", "buildingLastAccessDate", "buildingFloorUID", "buildingFloorName", 
+                    "buildingFloorDescription", "buildingFloorLastAccessDate", "buildingFloorAreaUID",
+                    "buildingFloorAreaName", "buildingFloorAreaDescription", "buildingFloorAreaLastAccessDate", "deviceRelationship"
+                    from "%s"."Device" d
+                    left join "%s"."DeviceModel" dm on d."deviceModel"=dm."id"
+                    left join "%s"."BuildingFloorArea" bfa on d."buildingFloorArea"=bfa."id"
+                    left join "%s"."BuildingFloor" bf on d."buildingFloor"=bf."id"
+                    left join "%s"."Building" b on d."building"=b."id"
+                    left join "%s"."Account" a on b."account"=a."id"
+                    where "devEUI"='%s'
+                ''' % (schema_name, schema_name, schema_name, schema_name, schema_name, schema_name, devEUI)
                 cursor.execute(query)
                 db_data = cursor.fetchone()
 
@@ -125,18 +112,19 @@ def handle_message(stop):
                         datadecoded = ''
                         json_datadecoded = {}
 
-                    ss = message.topic.split('/')
-                    prefix = ss[0]
-                    subtopic = ss[1]
                     if subtopic == 'events':
-                        db = MySQLdb.connect(host=cp.get('Default', 'host'),
-                                             user=cp.get('Default', 'user'),
-                                             passwd=cp.get('Default', 'passwd'),
-                                             db=cp.get('Default', 'db'))
+                        db = psycopg2.connect(host=cp.get('Default', 'host'),
+                                              user=cp.get('Default', 'user'),
+                                              password=cp.get('Default', 'passwd'),
+                                              database=cp.get('Default', 'db'),
+                                              port=5432,
+                                              options="-c search_path=dbo,%s" % schema_name)
                         cursor = db.cursor()
 
 
-                        query = "UPDATE Device SET deviceLastPayloadReceived='%s' WHERE id=%d" % (timestamp, db_data[0])
+                        query = '''
+                            UPDATE "%s"."Device" SET "deviceLastPayloadReceived"='%s' WHERE "id"=%d
+                        ''' % (schema_name, timestamp, db_data[0])
                         cursor.execute(query)
                         db.commit()
 
@@ -144,55 +132,57 @@ def handle_message(stop):
                         if len(json_datadecoded) > 0:
                             if get_item_from_dict('water_leak', json_datadecoded):
                                 query = '''
-                                    SELECT eventResolvedDate FROM Event WHERE device_id=%d and eventDescription='Water leak detected' 
-                                    ORDER BY eventCreatedDate DESC LIMIT 1
-                                ''' % db_data[0]
+                                    SELECT "eventResolvedDate" FROM "%s"."Event" WHERE "device_id"=%d and "eventDescription"='Water leak detected' 
+                                    ORDER BY "eventCreatedDate" DESC LIMIT 1
+                                ''' % (schema_name, db_data[0])
                                 cursor.execute(query)
                                 values = cursor.fetchone()
 
                                 if json_datadecoded['water_leak'] == 'leak':
                                     if values is None or values[0] is not None:
                                         query = '''
-                                            INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
+                                            INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
                                             VALUES ('%s', %d, %d, '%s')
-                                        ''' % ('Water leak detected', 1, db_data[0], timestamp)
+                                        ''' % (schema_name, 'Water leak detected', 1, db_data[0], timestamp)
                                         cursor.execute(query)
                                         db.commit()
                                 else:
                                     if values and values[0] is None:
                                         query = '''
-                                            UPDATE Event SET eventResolvedDate='%s' 
-                                            WHERE device_id=%d AND eventDescription='Water leak detected' and eventResolvedDate IS NULL
-                                        ''' % (timestamp, db_data[0])
+                                            UPDATE "%s"."Event" SET "eventResolvedDate"='%s' 
+                                            WHERE "device_id"=%d AND "eventDescription"='Water leak detected' and "eventResolvedDate" IS NULL
+                                        ''' % (schema_name, timestamp, db_data[0])
                                         cursor.execute(query)
                                         db.commit()
 
                             battery = get_item_from_dict('battery', json_datadecoded)
                             if battery:
                                 query = '''
-                                    SELECT eventResolvedDate FROM Event WHERE device_id=%d and eventDescription='Low Battery' 
-                                    ORDER BY eventCreatedDate DESC LIMIT 1
-                                ''' % db_data[0]
+                                    SELECT "eventResolvedDate" FROM "%s"."Event" WHERE "device_id"=%d and "eventDescription"='Low Battery' 
+                                    ORDER BY "eventCreatedDate" DESC LIMIT 1
+                                ''' % (schema_name, db_data[0])
                                 cursor.execute(query)
                                 values = cursor.fetchone()
 
                                 if battery < float(cp.get('Default', 'thres_Battery')):
                                     if values is None or values[0] is not None:
                                         query = '''
-                                            INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
+                                            INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
                                             VALUES ('%s', %d, %d, '%s')
-                                        ''' % ('Low Battery', 1, db_data[0], timestamp)
+                                        ''' % (schema_name, 'Low Battery', 1, db_data[0], timestamp)
                                         cursor.execute(query)
                                 else:
                                     if values and values[0] is None:
                                         query = '''
-                                            UPDATE Event SET eventResolvedDate='%s' 
-                                            WHERE device_id=%d AND eventDescription='Low Battery' AND eventResolvedDate IS NULL
-                                        ''' % (timestamp, db_data[0])
+                                            UPDATE "%s"."Event" SET "eventResolvedDate"='%s' 
+                                            WHERE "device_id"=%d AND "eventDescription"='Low Battery' AND "eventResolvedDate" IS NULL
+                                        ''' % (schema_name, timestamp, db_data[0])
                                         cursor.execute(query)
                                         db.commit()
 
-                                query = "UPDATE Device SET deviceBattery=%d, deviceBatteryUpdatedDate='%s' WHERE id=%d" % (battery, timestamp, db_data[0])
+                                query = '''
+                                    UPDATE "%s"."Device" SET "deviceBattery"=%d, "deviceBatteryUpdatedDate"='%s' WHERE "id"=%d
+                                ''' % (schema_name, battery, timestamp, db_data[0])
                                 cursor.execute(query)
                                 db.commit()
 
@@ -204,7 +194,9 @@ def handle_message(stop):
                                 else:
                                     valveStatus = 0
 
-                                query = "UPDATE Device SET deviceValveStatus=%d WHERE id=%d" % (valveStatus, db_data[0])
+                                query = '''
+                                    UPDATE "%s"."Device" SET "deviceValveStatus"=%d WHERE "id"=%d
+                                ''' % (schema_name, valveStatus, db_data[0])
                                 cursor.execute(query)
                                 db.commit()
 
@@ -215,9 +207,9 @@ def handle_message(stop):
                             rssi = get_item_from_dict('rssi', rxInfo[0])
 
                             query = '''
-                                SELECT eventResolvedDate FROM Event WHERE device_id=%d and eventDescription='Radio Lost' 
-                                ORDER BY eventCreatedDate DESC LIMIT 1
-                            ''' % db_data[0]
+                                SELECT "eventResolvedDate" FROM "%s"."Event" WHERE "device_id"=%d and "eventDescription"='Radio Lost' 
+                                ORDER BY "eventCreatedDate" DESC LIMIT 1
+                            ''' % (schema_name, db_data[0])
                             cursor.execute(query)
                             values = cursor.fetchone()
 
@@ -225,29 +217,31 @@ def handle_message(stop):
                                 if loRaSNR > float(cp.get('Default', 'thres_SNR')) or rssi < float(cp.get('Default', 'thres_RSSI')):
                                     if values is None or values[0] is not None:
                                         query = '''
-                                            INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
+                                            INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
                                             VALUES ('%s', %d, %d, '%s')
-                                        ''' % ('Radio Lost', 1, db_data[0], timestamp)
+                                        ''' % (schema_name, 'Radio Lost', 1, db_data[0], timestamp)
                                         cursor.execute(query)
                                         db.commit()
                                 else:
                                     if values and values[0] is None:
                                         query = '''
-                                            UPDATE Event SET eventResolvedDate='%s' 
-                                            WHERE device_id=%d AND eventDescription='Radio Lost' AND eventResolvedDate IS NULL
-                                        ''' % (timestamp, db_data[0])
+                                            UPDATE "%s"."Event" SET "eventResolvedDate"='%s' 
+                                            WHERE "device_id"=%d AND "eventDescription"='Radio Lost' AND "eventResolvedDate" IS NULL
+                                        ''' % (schema_name, timestamp, db_data[0])
                                         cursor.execute(query)
                                         db.commit()
 
                             if loRaSNR:
-                                query = "UPDATE Device SET deviceSNR=%d, deviceSNRUpdatedDate='%s' WHERE id=%d" \
-                                        % (loRaSNR, timestamp, db_data[0])
+                                query = '''
+                                    UPDATE "%s"."Device" SET "deviceSNR"=%d, "deviceSNRUpdatedDate"='%s' WHERE "id"=%d
+                                ''' % (schema_name, loRaSNR, timestamp, db_data[0])
                                 cursor.execute(query)
                                 db.commit()
 
                             if rssi:
-                                query = "UPDATE Device SET deviceRSSI=%d, deviceRSSIUpdatedDate='%s' WHERE id=%d" \
-                                        % (rssi, timestamp, db_data[0])
+                                query = '''
+                                    UPDATE "%s"."Device" SET "deviceRSSI"=%d, "deviceRSSIUpdatedDate"='%s' WHERE "id"=%d
+                                ''' % (schema_name, rssi, timestamp, db_data[0])
                                 cursor.execute(query)
                                 db.commit()
 
@@ -255,11 +249,11 @@ def handle_message(stop):
                         deviceRelationship = db_data[70]
                         if deviceRelationship and get_item_from_dict('water_leak', json_datadecoded) and json_datadecoded['water_leak'] == 'leak':
                             query = '''
-                            select d.id as id, deviceModelValveCommand
-                            from Device d
-                            left join DeviceModel dm on d.deviceModel=dm.id
-                            where devEUI='%s'
-                            ''' % deviceRelationship
+                            SELECT d."id" as "id", "deviceModelValveCommand"
+                            from "%s"."Device" d
+                            left join "%s"."DeviceModel" dm on d."deviceModel"=dm."id"
+                            where "devEUI"='%s'
+                            ''' % (schema_name, schema_name, deviceRelationship)
                             cursor.execute(query)
                             commands = cursor.fetchone()
 
@@ -274,18 +268,18 @@ def handle_message(stop):
 
                                         # insert valve close
                                         query = '''
-                                            INSERT INTO ValveClose (valveCloseDate, device_id) VALUES ('%s', %d)
-                                        ''' % (timestamp, commands[0])
+                                            INSERT INTO "%s"."ValveClose" ("valveCloseDate", "device_id") VALUES ('%s', %d)
+                                        ''' % (schema_name, timestamp, commands[0])
                                         cursor.execute(query)
                                         db.commit()
 
-                                        publish_command(close_command, prefix + '/commands/' + deviceRelationship)
+                                        publish_command(close_command, schema_name + '/' + prefix + '/commands/' + deviceRelationship)
 
                                         # add Valve Closed event
                                         query = '''
-                                            INSERT INTO Event (eventDescription, eventStatus, device_id, eventCreatedDate) 
+                                            INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
                                             VALUES ('%s', %d, %d, '%s')
-                                        ''' % ('Valve Closed', 1, commands[0], timestamp)
+                                        ''' % (schema_name, 'Valve Closed', 1, commands[0], timestamp)
                                         cursor.execute(query)
                                         db.commit()
 
@@ -396,44 +390,68 @@ def main():
             connected = False
 
             # connect to mysql server and get topics
-            db = MySQLdb.connect(host=cp.get('Default', 'host'),
-                                 user=cp.get('Default', 'user'),
-                                 passwd=cp.get('Default', 'passwd'),
-                                 db=cp.get('Default', 'db'))
+            db = psycopg2.connect(host=cp.get('Default', 'host'),
+                                  user=cp.get('Default', 'user'),
+                                  password=cp.get('Default', 'passwd'),
+                                  database=cp.get('Default', 'db'),
+                                  port=5432,)
             cursor = db.cursor()
-            query = "select buildingMqttTopicPrefix from Building"
+            
+            query = '''
+                SELECT "schema_name" from "organization_organization"
+            '''
 
             cursor.execute(query)
-            db_data = cursor.fetchall()
+            schema_data = cursor.fetchall()
 
             cursor.close()
             db.close()
 
             topics = []
-            for item in db_data:
-                if item[0]:
-                    topics.append((item[0].strip()+'/#', 0))
+            for schema_datum in schema_data:
+                schema_name = schema_datum[0]
+                if schema_name is not 'public':
+                    db = psycopg2.connect(host=cp.get('Default', 'host'),
+                              user=cp.get('Default', 'user'),
+                              password=cp.get('Default', 'passwd'),
+                              database=cp.get('Default', 'db'),
+                              port=5432,
+                              options="-c search_path=dbo,%s" % schema_name)
+                    cursor = db.cursor()
+                    query = '''
+                        SELECT "buildingMqttTopicPrefix" from "%s"."Building"
+                    ''' % schema_name
+
+                    cursor.execute(query)
+                    db_data = cursor.fetchall()
+
+                    cursor.close()
+                    db.close()
+
+                    for item in db_data:
+                        if item[0]:
+                            topics.append((schema_name+'/'+item[0].strip()+'/#', 0))
 
             if len(topics) == 0:
-                return
+                sleep(60)
+            else:
+                client.connect(awshost, awsport, keepalive=60)
 
-            client.connect(awshost, awsport, keepalive=60)
+                client.loop_start()
 
-            client.loop_start()
+                while not connected:
+                    sleep(0.1)
 
-            while not connected:
-                sleep(0.1)
+                stop_threads = False
+                thread = Thread(target=handle_message, args=(lambda: stop_threads, ))
+                thread.start()
 
-            stop_threads = False
-            thread = Thread(target=handle_message, args=(lambda: stop_threads, ))
-            thread.start()
+                client.subscribe(topics)
 
-            client.subscribe(topics)
-
-            sleep(3600)
-            client.loop_stop()
-            stop_threads = True
-            thread.join()
+                sleep(3600)
+                client.loop_stop()
+                stop_threads = True
+                thread.join()
 
         except Exception as err:
             print('error')

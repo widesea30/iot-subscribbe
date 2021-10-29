@@ -1,5 +1,7 @@
 sudo apt-get install python3-dev libmysqlclient-dev
 
+sudo apt install libpq-dev postgresql postgresql-contrib
+
 sudo python3 -m pip install -r requirements.txt
 
 - create and edit a custom systemd service to run the shell script at boot by running the following command in the terminal:
