@@ -67,7 +67,7 @@ def handle_message(stop):
                                       options="-c search_path=dbo,%s" % schema_name)
                 cursor = db.cursor()
                 query = '''
-                    select d."id" as "deviceUID", "buildingFloorAreaName", "deviceApplicationEUI", "deviceApplicationKey", 
+                    SELECT d."id" as "deviceUID", "buildingFloorAreaName", "deviceApplicationEUI", "deviceApplicationKey", 
                     "deviceGatewayEUI", "deviceSerialNumber", "deviceAssetNumber", "deviceLatitude", "deviceLongitude", "deviceAltitude",
                     "deviceMACAddress", "devicePicture", "deviceLastPayloadReceived", "deviceCreatedDate", "deviceLastAccessDate", 
                     "deviceModelUID", "deviceModelName", "en_deviceModelDescription", "fr_deviceModelDescription", 
@@ -88,7 +88,7 @@ def handle_message(stop):
                     left join "%s"."BuildingFloor" bf on d."buildingFloor"=bf."id"
                     left join "%s"."Building" b on d."building"=b."id"
                     left join "%s"."Account" a on b."account"=a."id"
-                    where "devEUI"='%s'
+                    where LOWER("devEUI")=LOWER('%s')
                 ''' % (schema_name, schema_name, schema_name, schema_name, schema_name, schema_name, devEUI)
                 cursor.execute(query)
                 db_data = cursor.fetchone()
@@ -142,8 +142,8 @@ def handle_message(stop):
                                     if values is None or values[0] is not None:
                                         query = '''
                                             INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
-                                            VALUES ('%s', %d, %d, '%s')
-                                        ''' % (schema_name, 'Water leak detected', 1, db_data[0], timestamp)
+                                            VALUES ('%s', TRUE, %d, '%s')
+                                        ''' % (schema_name, 'Water leak detected', db_data[0], timestamp)
                                         cursor.execute(query)
                                         db.commit()
                                 else:
@@ -168,8 +168,8 @@ def handle_message(stop):
                                     if values is None or values[0] is not None:
                                         query = '''
                                             INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
-                                            VALUES ('%s', %d, %d, '%s')
-                                        ''' % (schema_name, 'Low Battery', 1, db_data[0], timestamp)
+                                            VALUES ('%s', TRUE, %d, '%s')
+                                        ''' % (schema_name, 'Low Battery', db_data[0], timestamp)
                                         cursor.execute(query)
                                 else:
                                     if values and values[0] is None:
@@ -218,8 +218,8 @@ def handle_message(stop):
                                     if values is None or values[0] is not None:
                                         query = '''
                                             INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
-                                            VALUES ('%s', %d, %d, '%s')
-                                        ''' % (schema_name, 'Radio Lost', 1, db_data[0], timestamp)
+                                            VALUES ('%s', TRUE, %d, '%s')
+                                        ''' % (schema_name, 'Radio Lost', db_data[0], timestamp)
                                         cursor.execute(query)
                                         db.commit()
                                 else:
@@ -252,7 +252,7 @@ def handle_message(stop):
                             SELECT d."id" as "id", "deviceModelValveCommand"
                             from "%s"."Device" d
                             left join "%s"."DeviceModel" dm on d."deviceModel"=dm."id"
-                            where "devEUI"='%s'
+                            where LOWER("devEUI")=LOWER('%s')
                             ''' % (schema_name, schema_name, deviceRelationship)
                             cursor.execute(query)
                             commands = cursor.fetchone()
@@ -278,8 +278,8 @@ def handle_message(stop):
                                         # add Valve Closed event
                                         query = '''
                                             INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
-                                            VALUES ('%s', %d, %d, '%s')
-                                        ''' % (schema_name, 'Valve Closed', 1, commands[0], timestamp)
+                                            VALUES ('%s', TRUE, %d, '%s')
+                                        ''' % (schema_name, 'Valve Closed', commands[0], timestamp)
                                         cursor.execute(query)
                                         db.commit()
 
@@ -344,7 +344,7 @@ def handle_message(stop):
                     res = table.put_item(Item=new_item)
                     print(res)
         except Exception as err:
-            print('error')
+            print('error', err)
 
         sleep(1)
         if stop():
@@ -410,7 +410,7 @@ def main():
             topics = []
             for schema_datum in schema_data:
                 schema_name = schema_datum[0]
-                if schema_name is not 'public':
+                if schema_name != 'public':
                     db = psycopg2.connect(host=cp.get('Default', 'host'),
                               user=cp.get('Default', 'user'),
                               password=cp.get('Default', 'passwd'),
