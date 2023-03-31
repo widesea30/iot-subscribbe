@@ -81,7 +81,7 @@ def handle_message(stop):
                     "buildingAltitude", "buildingUrl", "buildingPicture", "buildingIcon", "buildingStatus",
                     "buildingMqttTopicPrefix", "buildingCreatedDate", "buildingLastAccessDate", "buildingFloorUID", "buildingFloorName", 
                     "buildingFloorDescription", "buildingFloorLastAccessDate", "buildingFloorAreaUID",
-                    "buildingFloorAreaName", "buildingFloorAreaDescription", "buildingFloorAreaLastAccessDate", "deviceRelationship"
+                    "buildingFloorAreaName", "buildingFloorAreaDescription", "buildingFloorAreaLastAccessDate"
                     from "%s"."Device" d
                     left join "%s"."DeviceModel" dm on d."deviceModel"=dm."id"
                     left join "%s"."BuildingFloorArea" bfa on d."buildingFloorArea"=bfa."id"
@@ -246,42 +246,42 @@ def handle_message(stop):
                                 db.commit()
 
                         # Send close command
-                        deviceRelationship = db_data[70]
-                        if deviceRelationship and get_item_from_dict('water_leak', json_datadecoded) and json_datadecoded['water_leak'] == 'leak':
-                            query = '''
-                            SELECT d."id" as "id", "deviceModelValveCommand"
-                            from "%s"."Device" d
-                            left join "%s"."DeviceModel" dm on d."deviceModel"=dm."id"
-                            where LOWER("devEUI")=LOWER('%s')
-                            ''' % (schema_name, schema_name, deviceRelationship)
-                            cursor.execute(query)
-                            commands = cursor.fetchone()
+                        query = '''
+                            SELECT "to_device_id", "deviceModelValveCommand", "devEUI" from "%s"."Device_deviceRelationship" ddr 
+                            left join "%s"."Device" d on ddr.to_device_id =d.id 
+                            left join "%s"."DeviceModel" dm on d."deviceModel" = dm.id
+                            where from_device_id=%d
+                        ''' % (schema_name, schema_name, schema_name, 85)
+                        cursor.execute(query)
+                        commands_data = cursor.fetchall()
 
-                            if commands and commands[1]:
-                                close_command = ''
-                                command_list = commands[1].splitlines()
-                                for command in command_list:
-                                    if command.find('CLOSE') > -1:
-                                        idx1 = command.find('{')
-                                        idx2 = command.find('}')
-                                        close_command = command[idx1:idx2+1]
+                        if commands_data and len(commands_data) > 0 and get_item_from_dict('water_leak', json_datadecoded) and json_datadecoded['water_leak'] == 'leak':
+                            for commands in commands_data:
+                                if commands and commands[1]:
+                                    close_command = ''
+                                    command_list = commands[1].splitlines()
+                                    for command in command_list:
+                                        if command.find('CLOSE') > -1:
+                                            idx1 = command.find('{')
+                                            idx2 = command.find('}')
+                                            close_command = command[idx1:idx2+1]
 
-                                        # insert valve close
-                                        query = '''
-                                            INSERT INTO "%s"."ValveClose" ("valveCloseDate", "device_id") VALUES ('%s', %d)
-                                        ''' % (schema_name, timestamp, commands[0])
-                                        cursor.execute(query)
-                                        db.commit()
+                                            # insert valve close
+                                            query = '''
+                                                INSERT INTO "%s"."ValveClose" ("valveCloseDate", "device_id") VALUES ('%s', %d)
+                                            ''' % (schema_name, timestamp, commands[0])
+                                            cursor.execute(query)
+                                            db.commit()
 
-                                        publish_command(close_command, schema_name + '/' + prefix + '/commands/' + deviceRelationship)
+                                            publish_command(close_command, schema_name + '/' + prefix + '/commands/' + commands[2])
 
-                                        # add Valve Closed event
-                                        query = '''
-                                            INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
-                                            VALUES ('%s', TRUE, %d, '%s')
-                                        ''' % (schema_name, 'Valve Closed', commands[0], timestamp)
-                                        cursor.execute(query)
-                                        db.commit()
+                                            # add Valve Closed event
+                                            query = '''
+                                                INSERT INTO "%s"."Event" ("eventDescription", "eventStatus", "device_id", "eventCreatedDate") 
+                                                VALUES ('%s', TRUE, %d, '%s')
+                                            ''' % (schema_name, 'Valve Closed', commands[0], timestamp)
+                                            cursor.execute(query)
+                                            db.commit()
 
                         cursor.close()
                         db.close()

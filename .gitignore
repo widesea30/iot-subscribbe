@@ -1,4 +1,4 @@
 setting.cfg
-setting.dev.cfg
-setting.demo.cfg
+setting.local.cfg
+setting.prod.cfg
 /CERT/*
