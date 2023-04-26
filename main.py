@@ -251,7 +251,7 @@ def handle_message(stop):
                             left join "%s"."Device" d on ddr.to_device_id =d.id 
                             left join "%s"."DeviceModel" dm on d."deviceModel" = dm.id
                             where from_device_id=%d
-                        ''' % (schema_name, schema_name, schema_name, 85)
+                        ''' % (schema_name, schema_name, schema_name, db_data[0])
                         cursor.execute(query)
                         commands_data = cursor.fetchall()
 
